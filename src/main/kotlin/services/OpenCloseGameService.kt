@@ -1,74 +1,111 @@
 package services
 
 import exceptions.PlayerInputException
-import model.ParticipantPlayer
-import model.PlayerType
-import model.PredictorPlayer
+import model.HumanPlayer
+import model.Player
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-open class OpenCloseGameService() {
+open class OpenCloseGameService(private val players: List<Player>) {
+    var reader = BufferedReader(InputStreamReader(System.`in`))
+    var predictorIndex = 0
+    var winner: Player? = null
 
     companion object {
-        private const val DEFAULT_WINNER = "No winner"
+        private const val WELCOME_MESSAGE = "Welcome to the game!"
+        private const val DEFAULT_WINNER_MESSAGE = "No winner"
+        private const val PLAY_AGAIN_QUESTION = "Do you want to play again?"
     }
 
-    var reader = BufferedReader(InputStreamReader(System.`in`))
-    var win = false
+    enum class PlayingAnswer(val char: Char) {
+        YES('Y'), NO('N')
+    }
 
-    fun play(predictorPlayer: PredictorPlayer, participantPlayer: ParticipantPlayer): String {
-        var result = DEFAULT_WINNER
-        try {
-            predictorPlayer.validate()
-            participantPlayer.validate()
-            if (predictorPlayer.isGuessCorrect(participantPlayer.hands)){
-                result = predictorPlayer.getWinner()
-                win = true
-            }
-
-
-        } catch (ex: PlayerInputException) {
-            result = "Bad input: ${ex.message}"
+    fun playOneRound() {
+        players.forEachIndexed { i, player ->
+            player.play(predictorIndex == i)
         }
-        return result
+        chooseWinner()
+    }
+
+    private fun chooseWinner() {
+        val numberOfOpenHand = players.sumOf { it.countOpenHand() }
+        if (players[predictorIndex].prediction == numberOfOpenHand) {
+            winner = players[predictorIndex]
+            println(winner?.winnerMessage)
+        } else {
+            println(DEFAULT_WINNER_MESSAGE)
+        }
     }
 
     fun startGame() {
-        println("Welcome to the game!")
-
-        var stillPlaying: String
-
+        println(WELCOME_MESSAGE)
+        var playingAnswer: PlayingAnswer = PlayingAnswer.YES
         do {
-            var isUserPredictor = true
-            do {
-                if (isUserPredictor) userPredictRound()
-                else aiPredictRound()
-                isUserPredictor = !isUserPredictor
-            } while (!win)
+            try {
+                askInputFromHumanPlayers()
+                playOneRound()
+                playingAnswer = wrapRound()
+            } catch (ex: PlayerInputException) {
+                println("Bad input: ${ex.message}")
+            }
 
-            println("Do you want to play again?")
-            stillPlaying = reader.readLine()
-            println(stillPlaying)
-        } while (stillPlaying != "N")
-
+        } while (playingAnswer != PlayingAnswer.NO)
     }
 
-    private fun userPredictRound() {
-        val userInput = getUserHands("You are")
-        val result = play(PredictorPlayer(PlayerType.USER, userInput), ParticipantPlayer(PlayerType.AI))
-        println(result)
+    private fun wrapRound(): PlayingAnswer {
+        var playingAnswer = PlayingAnswer.YES
+        if (isThereWinner()) {
+            playingAnswer = askToPlayAgain()
+        } else {
+            changePredictor()
+        }
+        resetPlayer()
+        return playingAnswer
     }
 
-    private fun aiPredictRound() {
-        val userInput = getUserHands("AI is")
-        val result = play(PredictorPlayer(PlayerType.AI), ParticipantPlayer(PlayerType.USER, userInput))
-        println(result)
+    private fun askToPlayAgain(): PlayingAnswer {
+        println(PLAY_AGAIN_QUESTION)
+        val rawAnswer: CharArray = reader.readLine().toCharArray()
+        val playingAnswer = PlayingAnswer.values().firstOrNull {
+            it.char == rawAnswer[0]
+        }!!
+        println(playingAnswer.char)
+        if (playingAnswer == PlayingAnswer.YES) {
+            reader.close()
+            resetGame()
+        }
+        return playingAnswer
     }
 
-    private fun getUserHands(predictorAlias: String): String {
-        println("$predictorAlias the predictor, what is your input?")
-        val userInput = reader.readLine()!!
-        println("You: $userInput")
-        return userInput
+    private fun resetGame() {
+        resetPredictorTurn()
+        winner = null
     }
+
+    private fun changePredictor() {
+        if (predictorIndex < (players.size - 1)) predictorIndex++
+        else resetPredictorTurn()
+    }
+
+    private fun resetPredictorTurn() {
+        predictorIndex = 0
+    }
+
+    private fun isThereWinner() = winner != null
+
+    private fun askInputFromHumanPlayers() {
+        val humanPlayers = players.filterIsInstance<HumanPlayer>()
+        humanPlayers.forEach {
+            it.printQuestion(players[predictorIndex].type)
+            val humanInput = reader.readLine()
+            it.enterInput(humanInput)
+        }
+    }
+
+    private fun resetPlayer() {
+        players.forEach { it.reset() }
+    }
+
+
 }
