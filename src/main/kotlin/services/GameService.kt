@@ -2,9 +2,7 @@ package services
 
 import exceptions.PlayerInputException
 import model.Game
-import model.HumanPlayer
-import model.Player
-import utils.GameUtil
+import model.isStillPlaying
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -33,7 +31,7 @@ open class GameService() {
             } catch (ex: PlayerInputException) {
                 println("Bad input: ${ex.message}")
             }
-        } while (GameUtil.isStillPlaying(this.game))
+        } while (this.game.isStillPlaying())
     }
 
 

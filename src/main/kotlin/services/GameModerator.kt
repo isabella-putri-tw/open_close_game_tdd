@@ -1,8 +1,6 @@
 package services
 
-import model.Game
-import model.HumanPlayer
-import model.Player
+import model.*
 import utils.GameUtil
 import java.io.BufferedReader
 
@@ -13,7 +11,7 @@ class GameModerator(var reader: BufferedReader) {
         private const val WELCOME_MESSAGE = "Welcome to the game!"
 
         private fun chooseWinner(players: List<Player>, predictor: Player): Player? {
-            val numberOfOpenHand = players.sumOf { GameUtil.countOpenHands(it.hands.toString()) }
+            val numberOfOpenHand = players.sumOf { it.countOpenHands() }
             if (predictor.prediction == numberOfOpenHand) {
                 return predictor
             }
@@ -36,12 +34,12 @@ class GameModerator(var reader: BufferedReader) {
     }
 
     fun wrapRound(game: Game) {
-        if (GameUtil.isThereWinner(game)) {
+        if (game.isThereWinner()) {
             askToPlayAgain(game)
         } else {
-            GameUtil.changePredictor(game)
+            game.changePredictor()
         }
-        GameUtil.resetPlayers(game)
+        game.resetPlayers()
     }
 
     private fun askToPlayAgain(game: Game) {
@@ -53,7 +51,7 @@ class GameModerator(var reader: BufferedReader) {
         println(playingAnswer.char)
         if (playingAnswer == Game.PlayingAnswer.YES) {
             reader.close()
-            GameUtil.resetGame(game)
+            game.reset()
         }
         game.playingAnswer = playingAnswer
     }

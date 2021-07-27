@@ -13,3 +13,12 @@ interface Player {
 
     fun play(isPredicting: Boolean)
 }
+
+fun Player.reset() {
+    this.hands = null
+    this.prediction = null
+}
+
+fun Player.countOpenHands(): Int {
+    return this.hands!!.count { it == Game.ValidInput.OPEN.char }
+}
