@@ -1,8 +1,9 @@
 import model.AIPlayer
+import model.Game
 import model.HumanPlayer
-import services.OpenCloseGameService
+import services.GameService
 
 fun main() {
-    val openCloseGameService = OpenCloseGameService(listOf(HumanPlayer(), AIPlayer()))
-    openCloseGameService.startGame()
+    val openCloseGameService = GameService()
+    openCloseGameService.startGame(Game(listOf(HumanPlayer(), AIPlayer())))
 }

@@ -1,17 +1,21 @@
 package model
 
+import services.GameModerator
+import utils.GameUtil
 import kotlin.random.Random
 
-open class AIPlayer: Player() {
-    override val type: Type = Type.AI
+open class AIPlayer : Player {
+    override var hands: String? = null
+    override var prediction: Int? = null
+    override val type: Player.Type = Player.Type.AI
     override val winnerMessage: String = "AI WIN!!!"
 
     override fun play(isPredicting: Boolean) {
-        hands = (1..2).map { VALID_INPUT_ARRAY.random() }.joinToString("")
+        hands = (1..2).map { Game.VALID_INPUT_ARRAY.random() }.joinToString("")
         if (isPredicting) prediction = Random.nextInt(
-            MIN_RANGE_GUESS,
-            MAX_RANGE_GUESS
+            Game.MIN_RANGE_GUESS,
+            Game.MAX_RANGE_GUESS
         )
-        printPlayerInput()
+        GameUtil.printPlayerInput(this)
     }
 }

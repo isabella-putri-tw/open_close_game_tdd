@@ -4,6 +4,7 @@ import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isNull
 import model.AIPlayer
+import model.Game
 import model.HumanPlayer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -17,12 +18,13 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.whenever
+import utils.GameUtil
 import java.io.BufferedReader
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 
 
-internal class OpenCloseGameServiceTest {
+internal class GameServiceTest {
 
     @Nested
     inner class PlayOneRound() {
@@ -43,38 +45,40 @@ internal class OpenCloseGameServiceTest {
         @Test
         fun `user lost when number of open hand is incorrect`() {
             val humanPlayer = HumanPlayer()
-            val openCloseGameService = OpenCloseGameService(listOf(humanPlayer, spyAIPlayer))
+            val gameService = GameService()
+            gameService.game = Game(listOf(humanPlayer, spyAIPlayer))
 
             doAnswer {
                 spyAIPlayer.hands = "OC"
             }.whenever(spyAIPlayer).play(any())
             humanPlayer.enterInput("CO3")
 
-            openCloseGameService.playOneRound()
+            gameService.playOneRound()
 
-            assertThat(openCloseGameService.winner).isNull()
+            assertThat(gameService.game.winner).isNull()
         }
 
         @Test
         fun `user win when number of open hand is correct`() {
             val humanPlayer = HumanPlayer()
-            val openCloseGameService = OpenCloseGameService(listOf(humanPlayer, spyAIPlayer))
+            val gameService = GameService()
+            gameService.game = Game(listOf(humanPlayer, spyAIPlayer))
 
             doAnswer {
                 spyAIPlayer.hands = "OO"
             }.whenever(spyAIPlayer).play(any())
             humanPlayer.enterInput("CO3")
 
-            openCloseGameService.playOneRound()
+            gameService.playOneRound()
 
-            assertThat(openCloseGameService.winner).isEqualTo(humanPlayer)
+            assertThat(gameService.game.winner).isEqualTo(humanPlayer)
         }
 
         @Test
         fun `no winner when not user's turn to guess and AI guess wrong`() {
             val humanPlayer = HumanPlayer()
-            val openCloseGameService = OpenCloseGameService(listOf(humanPlayer, spyAIPlayer))
-            openCloseGameService.predictorIndex = 1
+            val gameService = GameService()
+            gameService.game = Game(listOf(humanPlayer, spyAIPlayer), 1)
 
             doAnswer {
                 spyAIPlayer.hands = "OC"
@@ -82,16 +86,16 @@ internal class OpenCloseGameServiceTest {
             }.whenever(spyAIPlayer).play(any())
             humanPlayer.enterInput("CC")
 
-            openCloseGameService.playOneRound()
+            gameService.playOneRound()
 
-            assertThat(openCloseGameService.winner).isNull()
+            assertThat(gameService.game.winner).isNull()
         }
 
         @Test
         fun `AI wins when not user's turn to guess and AI guess wrong`() {
             val humanPlayer = HumanPlayer()
-            val openCloseGameService = OpenCloseGameService(listOf(humanPlayer, spyAIPlayer))
-            openCloseGameService.predictorIndex = 1
+            val gameService = GameService()
+            gameService.game = Game(listOf(humanPlayer, spyAIPlayer), 1)
 
             doAnswer {
                 spyAIPlayer.hands = "OC"
@@ -99,9 +103,9 @@ internal class OpenCloseGameServiceTest {
             }.whenever(spyAIPlayer).play(any())
             humanPlayer.enterInput("CC")
 
-            openCloseGameService.playOneRound()
+            gameService.playOneRound()
 
-            assertThat(openCloseGameService.winner).isEqualTo(spyAIPlayer)
+            assertThat(gameService.game.winner).isEqualTo(spyAIPlayer)
         }
     }
 
@@ -113,7 +117,7 @@ internal class OpenCloseGameServiceTest {
         @Mock
         lateinit var mockReader: BufferedReader
 
-        lateinit var openCloseGameService: OpenCloseGameService
+        lateinit var gameService: GameService
 
         @Spy
         lateinit var spyAIPlayer: AIPlayer
@@ -123,8 +127,9 @@ internal class OpenCloseGameServiceTest {
         fun setUp() {
             MockitoAnnotations.openMocks(this)
             System.setOut(PrintStream(outputStreamCaptor))
-            openCloseGameService = OpenCloseGameService(listOf(HumanPlayer(), spyAIPlayer))
-            openCloseGameService.reader = mockReader
+            gameService = GameService()
+            gameService.reader = mockReader
+            gameService.gameModerator.reader = mockReader
         }
 
         @AfterEach
@@ -138,12 +143,12 @@ internal class OpenCloseGameServiceTest {
         fun `should repeat ask input again when human input is incorrect`() {
             doAnswer {
                 spyAIPlayer.hands = "OO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.whenever(spyAIPlayer).play(any())
 
             Mockito.`when`(mockReader.readLine()).thenReturn("O3", "OC3", "N")
 
-            openCloseGameService.startGame()
+            gameService.startGame(Game(listOf(HumanPlayer(), spyAIPlayer)))
 
             assertThat(outputStreamCaptor.toString().trim()).isEqualTo(
                 "Welcome to the game!\n" +
@@ -163,12 +168,12 @@ internal class OpenCloseGameServiceTest {
         fun `should ask to end game and end when user correct guess and end game`() {
             doAnswer {
                 spyAIPlayer.hands = "OO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.whenever(spyAIPlayer).play(any())
 
             Mockito.`when`(mockReader.readLine()).thenReturn("OC3", "N")
 
-            openCloseGameService.startGame()
+            gameService.startGame(Game(listOf(HumanPlayer(), spyAIPlayer)))
 
             assertThat(outputStreamCaptor.toString().trim()).isEqualTo(
                 "Welcome to the game!\n" +
@@ -185,16 +190,16 @@ internal class OpenCloseGameServiceTest {
         fun `should repeat game when user wrong guess and then AI win`() {
             doAnswer {
                 spyAIPlayer.hands = "OO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.doAnswer {
                 spyAIPlayer.hands = "CO"
                 spyAIPlayer.prediction = 1
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.whenever(spyAIPlayer).play(any())
 
             Mockito.`when`(mockReader.readLine()).thenReturn("OC2", "CC", "N")
 
-            openCloseGameService.startGame()
+            gameService.startGame(Game(listOf(HumanPlayer(), spyAIPlayer)))
 
             assertThat(outputStreamCaptor.toString().trim()).isEqualTo(
                 "Welcome to the game!\n" +
@@ -215,19 +220,19 @@ internal class OpenCloseGameServiceTest {
         fun `should repeat game 3 times when until user win`() {
             doAnswer {
                 spyAIPlayer.hands = "OO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.doAnswer {
                 spyAIPlayer.hands = "CO"
                 spyAIPlayer.prediction = 2
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.doAnswer {
                 spyAIPlayer.hands = "CC"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.whenever(spyAIPlayer).play(any())
 
             Mockito.`when`(mockReader.readLine()).thenReturn("OC2", "CC", "OO2", "N")
 
-            openCloseGameService.startGame()
+            gameService.startGame(Game(listOf(HumanPlayer(), spyAIPlayer)))
 
 
             assertThat(outputStreamCaptor.toString().trim()).isEqualTo(
@@ -253,18 +258,18 @@ internal class OpenCloseGameServiceTest {
         fun `should play thrice when user wants to play again twice`() {
             doAnswer {
                 spyAIPlayer.hands = "OO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.doAnswer {
                 spyAIPlayer.hands = "CC"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.doAnswer {
                 spyAIPlayer.hands = "CO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.whenever(spyAIPlayer).play(any())
 
             Mockito.`when`(mockReader.readLine()).thenReturn("OC3", "Y", "OO2", "Y", "CO2", "N")
 
-            openCloseGameService.startGame()
+            gameService.startGame(Game(listOf(HumanPlayer(), spyAIPlayer)))
 
             assertThat(outputStreamCaptor.toString().trim()).isEqualTo(
                 "Welcome to the game!\n" +
@@ -293,19 +298,19 @@ internal class OpenCloseGameServiceTest {
         fun `should reset winner when after play again`() {
             doAnswer {
                 spyAIPlayer.hands = "CO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.doAnswer {
                 spyAIPlayer.hands = "OO"
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.doAnswer {
                 spyAIPlayer.hands = "CO"
                 spyAIPlayer.prediction = 1
-                spyAIPlayer.printPlayerInput()
+                GameUtil.printPlayerInput(spyAIPlayer)
             }.whenever(spyAIPlayer).play(any())
 
             Mockito.`when`(mockReader.readLine()).thenReturn("OC2", "Y", "OC2", "CC", "N")
 
-            openCloseGameService.startGame()
+            gameService.startGame(Game(listOf(HumanPlayer(), spyAIPlayer)))
 
             assertThat(outputStreamCaptor.toString().trim()).isEqualTo(
                 "Welcome to the game!\n" +
